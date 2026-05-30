@@ -7,13 +7,13 @@ const qrcode = require("qrcode-terminal")
 const axios = require("axios")
 const http = require("http")
 
-// Mantém a conexão segura e ignora erros de certificado SSL no servidor
+// Mantém a conexão segura
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-// Servidor "fantasma" para manter o bot online no Render
+// Servidor "fantasma" para o Render não encerrar o bot por inatividade
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Bot está rodando!');
+    res.end('Bot ativo');
 }).listen(process.env.PORT || 8080);
 
 async function iniciarBot() {
@@ -21,7 +21,7 @@ async function iniciarBot() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // Alterado para false pois usaremos o console.log abaixo
+        printQRInTerminal: false,
         connectTimeoutMs: 60000,
         defaultQueryTimeoutMs: 60000,
         keepAliveIntervalMs: 10000,
@@ -34,18 +34,17 @@ async function iniciarBot() {
         const { connection, lastDisconnect, qr } = update;
         
         if (qr) {
-            console.log("QR Code gerado! Escaneie abaixo:");
+            console.log("--- QR CODE ABAIXO ---");
             qrcode.generate(qr, { small: true });
+            console.log("--- ESCANEIE EM ATÉ 30 SEGUNDOS ---");
         }
         
         if (connection === "close") {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== 401;
-            console.log("Conexão fechada, tentando reconectar...", shouldReconnect);
-            if (shouldReconnect) {
-                iniciarBot();
-            }
+            console.log("Conexão fechada, reconectando...");
+            if (shouldReconnect) iniciarBot();
         } else if (connection === "open") {
-            console.log("BOT ONLINE");
+            console.log("BOT ONLINE COM SUCESSO");
         }
     })
 
@@ -58,20 +57,12 @@ async function iniciarBot() {
 
         const numero = msg.key.remoteJid
 
-        if (texto.toLowerCase() === "menu") {
-            await sock.sendMessage(numero, { text: "🤖 MENU\n\n1 - Atendimento\n2 - Planos\n3 - Suporte" })
-            return
-        }
-
         try {
             const resposta = await axios.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 {
                     model: "llama3-70b-8192",
-                    messages: [
-                        { role: "system", content: "Você é um atendente simpático." },
-                        { role: "user", content: texto }
-                    ]
+                    messages: [{ role: "user", content: texto }]
                 },
                 {
                     headers: {
@@ -82,8 +73,7 @@ async function iniciarBot() {
             )
             await sock.sendMessage(numero, { text: resposta.data.choices[0].message.content })
         } catch (erro) {
-            console.log("Erro na API Groq:", erro.message)
-            await sock.sendMessage(numero, { text: "Erro ao processar a resposta." })
+            console.log("Erro na API:", erro.message)
         }
     })
 }
