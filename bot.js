@@ -1,6 +1,7 @@
 const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys");
 const axios = require("axios");
 const http = require("http");
+const qrcode = require("qrcode"); // Certifique-se de ter instalado esta biblioteca
 
 // Servidor para manter o Render ativo
 http.createServer((req, res) => {
@@ -14,18 +15,20 @@ async function iniciarBot() {
 
     sock.ev.on("creds.update", saveCreds);
 
-    sock.ev.on("connection.update", (update) => {
+    sock.ev.on("connection.update", async (update) => {
         const { connection, qr } = update;
         
-        // Esta parte gera o link para o QR Code
         if (qr) {
-            console.log("--- QR CODE ABAIXO (COPIE O LINK ABAIXO E COLE NO NAVEGADOR) ---");
-            console.log(`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}`);
+            console.log("--- QR CODE ABAIXO ---");
+            // Gera o QR Code em formato de texto para aparecer no log
+            const qrText = await qrcode.toString(qr, { type: 'terminal', small: true });
+            console.log(qrText);
+            console.log("--- ESCANEIE EM ATÉ 30 SEGUNDOS ---");
         }
         
         if (connection === "open") console.log("BOT ONLINE");
     });
 
-    // ... (restante do código da API Groq)
+    // ... (restante do seu código da API Groq)
 }
 iniciarBot();
